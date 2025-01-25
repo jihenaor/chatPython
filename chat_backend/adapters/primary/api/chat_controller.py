@@ -7,7 +7,7 @@ import logging
 
 from application.use_cases.ask_question import AskQuestionUseCase
 
-# Configurar logging
+# Configurar logging test
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
