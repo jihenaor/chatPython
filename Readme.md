@@ -41,6 +41,8 @@ pip install langchain-community
 pip install -U langchain_openai
 pip install -qU langchain-ollama
 
+Nuvas instalaciones
+pip install chromadb langchain-openai langchain-chroma
 
 Test
 uvicorn main:router --reload
@@ -52,4 +54,15 @@ curl --location 'http://127.0.0.1:8000/chat' \
     "input_language": "English",
     "output_language": "Spanish",
     "question": "I love programming."
+}'
+
+curl --location 'http://127.0.0.1:8000/chat' \
+--header 'Content-Type: application/json' \
+--data '{
+	"session_id": "1234",
+	"query": "Dónde se puede visualizar el perfil de cargo?",
+	"model": "ollama",
+	"additional_params": {
+	"query_type": "company_info"
+	}
 }'
