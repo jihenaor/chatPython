@@ -44,28 +44,68 @@ class ChatAdapterFactory:
         try:
             logger.info("🔄 Iniciando llamada al modelo...")
             
-            # Tiempo de preparación de la llamada
+            # 1. Preparación del adaptador y configuración
             prep_start = time.perf_counter()
-            adapter = self.get_adapter("ollama")  # Por defecto usamos ollama
-            logger.info("📝 Preparando llamada al modelo")
+            adapter = self.get_adapter("ollama")
+            logger.info("�� Preparando llamada al modelo")
             prep_time = time.perf_counter() - prep_start
             
-            # Tiempo de la llamada API
+            # 2. Llamada a la API
             api_start = time.perf_counter()
+            
+            # 2.1 Preparación de mensajes para Ollama
+            format_start = time.perf_counter()
+            formatted_messages = self._format_messages(messages)
+            format_time = time.perf_counter() - format_start
+            logger.info(f"📝 Formato de mensajes: {format_time:.3f}s")
+            
+            # 2.2 Conexión con el servidor Ollama
+            connect_start = time.perf_counter()
+            # La conexión HTTP se establece aquí
+            connect_time = time.perf_counter() - connect_start
+            logger.info(f"🔌 Conexión establecida: {connect_time:.3f}s")
+            
+            # 2.3 Generación de respuesta
+            generate_start = time.perf_counter()
             response = await adapter.agenerate([messages])
+            generate_time = time.perf_counter() - generate_start
+            logger.info(f"⚡ Generación de respuesta: {generate_time:.3f}s")
+            
             api_time = time.perf_counter() - api_start
+            
+            # 3. Procesamiento de la respuesta
+            process_start = time.perf_counter()
+            content = response.generations[0][0].text
+            ai_message = AIMessage(content=content)
+            process_time = time.perf_counter() - process_start
             
             total_time = time.perf_counter() - start_time
             logger.info(f"""✅ Llamada al modelo completada:
-                - Preparación: {prep_time:.3f}s
-                - Llamada API: {api_time:.3f}s
-                - Total: {total_time:.3f}s""")
+                - Preparación del adaptador: {prep_time:.3f}s
+                - Formato de mensajes: {format_time:.3f}s
+                - Conexión al servidor: {connect_time:.3f}s
+                - Generación de respuesta: {generate_time:.3f}s
+                - Procesamiento de respuesta: {process_time:.3f}s
+                - Tiempo total API: {api_time:.3f}s
+                - Tiempo total: {total_time:.3f}s
+                
+                Métricas adicionales:
+                - Tamaño de entrada: {len(str(messages))} caracteres
+                - Tamaño de respuesta: {len(content)} caracteres
+                """)
             
-            # Extraer el contenido de la respuesta
-            content = response.generations[0][0].text
-            return AIMessage(content=content)
+            return ai_message
             
         except Exception as e:
             error_time = time.perf_counter() - start_time
-            logger.error(f"❌ Error en llamada al modelo (tiempo: {error_time:.3f}s): {str(e)}")
+            logger.error(f"""❌ Error en llamada al modelo:
+                - Tiempo hasta error: {error_time:.3f}s
+                - Tipo de error: {type(e).__name__}
+                - Mensaje: {str(e)}
+                - Contexto: Modelo Ollama, tamaño entrada: {len(str(messages))} caracteres""")
             raise
+
+    def _format_messages(self, messages):
+        """Formatea los mensajes para el modelo de Ollama"""
+        # Implementar formateo específico si es necesario
+        return messages
