@@ -1,7 +1,5 @@
 .idea/workspace.xml
 
-.env
-
 # Ignorar archivos compilados de Python
 __pycache__/
 *.py[cod]

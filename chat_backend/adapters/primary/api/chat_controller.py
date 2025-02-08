@@ -29,63 +29,25 @@ MODEL_MAX_TOKENS = {
 @router.post("/chat")
 async def ask_question(request: QuestionRequest):
     start_time = time.perf_counter()
-    logger.info(f"""📝 Nueva solicitud de chat:
-        - Session ID: {request.session_id}
-        - Modelo: {request.model}
-        - Query: {request.query[:50]}...
-        - Params adicionales: {request.additional_params}""")
+    logger.info(f"📝 Nueva consulta: {request.query[:50]}...")
     
     try:
-        # Configuración
-        config_start = time.perf_counter()
-        use_trim = os.getenv("USE_TRIM", "false").lower() == "true"
-        max_tokens = MODEL_MAX_TOKENS.get(request.model, 2048)
-        logger.info(f"""⚙️ Configuración:
-            - Use trim: {use_trim}
-            - Max tokens: {max_tokens}""")
-        config_time = time.perf_counter() - config_start
-        
-        # Ejecución del caso de uso
-        use_case_start = time.perf_counter()
         use_case = AskQuestionUseCase()
-        logger.info("🔄 Ejecutando caso de uso...")
-        
-        # Aquí esperamos la respuesta asíncrona
         response = await use_case.execute(
-            session_id=request.session_id,
             query=request.query,
             model=request.model,
-            additional_params=request.additional_params,
-            use_trim=use_trim,
-            max_tokens=max_tokens
+            max_tokens=MODEL_MAX_TOKENS.get(request.model, 2048)
         )
-        use_case_time = time.perf_counter() - use_case_start
         
-        # Métricas finales
         total_time = time.perf_counter() - start_time
-        logger.info(f"""✅ Respuesta generada exitosamente:
-            - Tiempo de configuración: {config_time:.3f}s
-            - Tiempo de ejecución: {use_case_time:.3f}s
-            - Tiempo total: {total_time:.3f}s
-            - Longitud de respuesta: {len(str(response))} caracteres""")
+        logger.info(f"✅ Respuesta generada en {total_time:.3f}s")
         
         return {"response": response}
-    
+        
     except Exception as e:
         error_time = time.perf_counter() - start_time
-        logger.error(f"""❌ Error en el endpoint de chat:
-            - Tiempo hasta error: {error_time:.2f}s
-            - Error: {str(e)}
-            - Session ID: {request.session_id}""")
-        
-        if isinstance(e, HTTPException):
-            raise e
+        logger.error(f"❌ Error: {str(e)} ({error_time:.3f}s)")
         raise HTTPException(
             status_code=500,
-            detail={
-                "error": str(e),
-                "session_id": request.session_id,
-                "model": request.model,
-                "processing_time": f"{error_time:.2f}s"
-            }
+            detail=str(e)
         )
