@@ -13,22 +13,16 @@ async def lifespan(app: FastAPI):
     start_time = time.perf_counter()
     logger.info("🚀 Iniciando aplicación...")
     try:
-        # Cargar documentos
-        docs_start = time.perf_counter()
-        documents = load_documents()
-        docs_time = time.perf_counter() - docs_start
-        logger.info(f"📚 Documentos cargados en {docs_time:.2f} segundos")
+        # Inicializar el VectorStoreManager
+        logger.info("📚 Inicializando Vector Store Manager...")
+        await VectorStoreManager.initialize()
         
-        if documents:
-            store_start = time.perf_counter()
-            vector_store = VectorStoreManager().vector_store
-            store_time = time.perf_counter() - store_start
-            logger.info(f"✅ Vector store inicializado en {store_time:.2f} segundos")
-        else:
-            logger.warning("⚠️ No se inicializó el vector store porque no hay documentos")
+        # Ahora podemos obtener la instancia inicializada
+        vector_store = VectorStoreManager().vector_store
+        logger.info("✅ Vector Store inicializado correctamente")
         
         total_time = time.perf_counter() - start_time
-        logger.info(f"🎉 Aplicación iniciada en {total_time:.2f} segundos")
+        logger.info(f"🎉 Aplicación iniciada en {total_time:.3f}s")
         yield
     finally:
         logger.info("👋 Limpiando recursos...")

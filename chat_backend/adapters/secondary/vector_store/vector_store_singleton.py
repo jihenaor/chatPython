@@ -14,84 +14,58 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class VectorStoreManager:
-    _instance: Optional['VectorStoreManager'] = None
+    _instance = None
     _vector_store = None
-    _initialized = False
     
     def __new__(cls):
         if cls._instance is None:
-            logger.info("🚀 Creando nueva instancia de VectorStoreManager")
             cls._instance = super(VectorStoreManager, cls).__new__(cls)
         return cls._instance
     
-    def initialize_with_documents(self, documents):
-        """Inicializa la base de datos vectorial con documentos"""
-        if not documents:
-            logger.warning("⚠️ No hay documentos para inicializar el vector store")
-            return
-
-        if not self._initialized:
-            start_time = time.perf_counter()
+    @classmethod
+    async def initialize(cls):
+        """Inicialización asíncrona al inicio de la aplicación"""
+        if cls._vector_store is None:
             try:
-                logger.info("🔄 Iniciando proceso de inicialización del vector store...")
+                logger.info("🔄 Inicializando vector store...")
+                start_time = time.perf_counter()
                 
-                # Inicializar embeddings
+                # Cargar documentos
+                docs_start = time.perf_counter()
+                documents = load_documents()
+                if not documents:
+                    raise ValueError("No se encontraron documentos para cargar")
+                docs_time = time.perf_counter() - docs_start
+                logger.info(f"📚 Documentos cargados en {docs_time:.3f}s")
+                
+                # Crear embeddings
                 embed_start = time.perf_counter()
-                logger.info("📊 Configurando Ollama Embeddings...")
-                embeddings = OllamaEmbeddings(
-                    model="llama3.2",
-                    base_url="http://localhost:11434"
-                )
-                embed_time = time.perf_counter() - embed_start
-                logger.info(f"✅ Embeddings configurados en {embed_time:.2f} segundos")
+                embeddings = OllamaEmbeddings(model="llama3.2")
                 
-                # Configurar directorio de persistencia
+                # Usar Chroma para persistencia
                 persist_directory = os.path.join(os.path.dirname(__file__), '../../../vector_store')
-                logger.info(f"📁 Usando directorio de persistencia: {persist_directory}")
                 os.makedirs(persist_directory, exist_ok=True)
                 
-                # Inicializar Chroma
-                chroma_start = time.perf_counter()
-                logger.info("🔨 Inicializando base de datos Chroma...")
-                self._vector_store = Chroma(
-                    persist_directory=persist_directory,
-                    embedding_function=embeddings
+                cls._vector_store = Chroma.from_documents(
+                    documents=documents,
+                    embedding=embeddings,
+                    persist_directory=persist_directory
                 )
-                chroma_time = time.perf_counter() - chroma_start
-                logger.info(f"✅ Chroma inicializado en {chroma_time:.2f} segundos")
+                embed_time = time.perf_counter() - embed_start
                 
-                # Agregar documentos
-                docs_start = time.perf_counter()
-                logger.info(f"📝 Agregando {len(documents)} documentos al vector store...")
-                self._vector_store.add_documents(documents)
-                docs_time = time.perf_counter() - docs_start
-                logger.info(f"✅ Documentos agregados en {docs_time:.2f} segundos")
-                
-                self._initialized = True
                 total_time = time.perf_counter() - start_time
-                logger.info(f"🎉 Vector store inicializado exitosamente en {total_time:.2f} segundos")
-                logger.info(f"""📊 Desglose de tiempos:
-                    - Configuración de embeddings: {embed_time:.2f}s
-                    - Inicialización de Chroma: {chroma_time:.2f}s
-                    - Carga de documentos: {docs_time:.2f}s
-                    - Total: {total_time:.2f}s""")
+                logger.info(f"""✅ Vector store inicializado:
+                    - Carga de documentos: {docs_time:.3f}s
+                    - Creación de embeddings: {embed_time:.3f}s
+                    - Tiempo total: {total_time:.3f}s""")
                 
             except Exception as e:
-                logger.error(f"❌ Error en la inicialización: {str(e)}")
+                logger.error(f"❌ Error inicializando vector store: {str(e)}")
                 raise
     
     @property
     def vector_store(self):
         """Retorna la instancia de la base de datos vectorial"""
-        if not self._initialized:
-            start_time = time.perf_counter()
-            logger.info("🔄 Iniciando carga lazy del vector store...")
-            documents = load_documents()
-            self.initialize_with_documents(documents)
-            total_time = time.perf_counter() - start_time
-            logger.info(f"✅ Carga lazy completada en {total_time:.2f} segundos")
-            
         if self._vector_store is None:
-            raise RuntimeError("❌ Vector store no está inicializado")
-            
+            raise RuntimeError("❌ Vector store no está inicializado. Llame a initialize() primero.")
         return self._vector_store 

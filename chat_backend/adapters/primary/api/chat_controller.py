@@ -50,7 +50,8 @@ async def ask_question(request: QuestionRequest):
         use_case = AskQuestionUseCase()
         logger.info("🔄 Ejecutando caso de uso...")
         
-        response = use_case.execute(
+        # Aquí esperamos la respuesta asíncrona
+        response = await use_case.execute(
             session_id=request.session_id,
             query=request.query,
             model=request.model,
@@ -63,9 +64,9 @@ async def ask_question(request: QuestionRequest):
         # Métricas finales
         total_time = time.perf_counter() - start_time
         logger.info(f"""✅ Respuesta generada exitosamente:
-            - Tiempo de configuración: {config_time:.2f}s
-            - Tiempo de ejecución: {use_case_time:.2f}s
-            - Tiempo total: {total_time:.2f}s
+            - Tiempo de configuración: {config_time:.3f}s
+            - Tiempo de ejecución: {use_case_time:.3f}s
+            - Tiempo total: {total_time:.3f}s
             - Longitud de respuesta: {len(str(response))} caracteres""")
         
         return {"response": response}

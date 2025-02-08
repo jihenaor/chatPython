@@ -14,6 +14,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, MessagesState, StateGraph
 import logging
 import time
+from adapters.secondary.vector_store.vector_store_singleton import VectorStoreManager
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +91,11 @@ langgraph_app = workflow.compile(checkpointer=memory)
 
 # Modify use case to interact with different LLMs
 class AskQuestionUseCase:
-    def execute(self, session_id: str, query: str, model: str, additional_params: Optional[Dict[str, str]] = None,
+    def __init__(self):
+        self.vector_store = VectorStoreManager().vector_store
+        self.chat_adapter = ChatAdapterFactory()
+        
+    async def execute(self, session_id: str, query: str, model: str, additional_params: Optional[Dict[str, str]] = None,
                 use_trim: bool = False, max_tokens: int = 2048) -> str:
         start_time = time.perf_counter()
         
@@ -111,21 +116,8 @@ class AskQuestionUseCase:
             if use_rag:
                 # 3. Recuperación de documentos relevantes
                 retrieval_start = time.perf_counter()
-                global vector_store
-                if vector_store is None:
-                    try:
-                        pages = load_documents()
-                        if model == "ollama":
-                            vector_store = InMemoryVectorStore.from_documents(pages, OllamaEmbeddings(model="llama3"))
-                        else:
-                            vector_store = InMemoryVectorStore.from_documents(pages, OpenAIEmbeddings())
-                        print(f"Loaded {len(pages)} pages from knowledge base.")
-                    except FileNotFoundError as e:
-                        print(e)
-                        return "Error: Knowledge base file not found."
-
-                retriever = vector_store.as_retriever()
-                retrieved_docs = retriever.invoke(query, k=2)
+                retriever = self.vector_store.as_retriever()
+                retrieved_docs = await retriever.ainvoke(query, k=2)
                 retrieval_time = time.perf_counter() - retrieval_start
                 logger.info(f"⏱️ Tiempo recuperación documentos: {retrieval_time:.3f}s")
 
@@ -149,7 +141,7 @@ class AskQuestionUseCase:
 
             # 6. Llamada al modelo
             model_start = time.perf_counter()
-            response = self._invoke_langgraph_app(session_id, prompt_value, model, use_trim, max_tokens)
+            response = await self.chat_adapter.invoke(prompt_value.messages)
             model_time = time.perf_counter() - model_start
             logger.info(f"⏱️ Tiempo llamada al modelo: {model_time:.3f}s")
 
@@ -170,7 +162,7 @@ class AskQuestionUseCase:
                 - Modelo usado: {model}
                 """)
 
-            return response
+            return response.content
 
         except Exception as e:
             error_time = time.perf_counter() - start_time

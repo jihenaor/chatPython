@@ -1,5 +1,6 @@
 from langchain_ollama import ChatOllama
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import AIMessage
 import os
 from dotenv import load_dotenv
 import time
@@ -34,7 +35,9 @@ class ChatAdapterFactory:
         }
 
     def get_adapter(self, model_name: str):
-        return self.adapters.get(model_name, self.adapters["ollama"])
+        adapter = self.adapters.get(model_name, self.adapters["ollama"])
+        logger.info(f"🔄 Usando adaptador para modelo: {model_name}")
+        return adapter
 
     async def invoke(self, messages):
         start_time = time.perf_counter()
@@ -43,23 +46,24 @@ class ChatAdapterFactory:
             
             # Tiempo de preparación de la llamada
             prep_start = time.perf_counter()
-            model_name = self.model_name
-            logger.info(f"📝 Preparando llamada para modelo: {model_name}")
+            adapter = self.get_adapter("ollama")  # Por defecto usamos ollama
+            logger.info("📝 Preparando llamada al modelo")
             prep_time = time.perf_counter() - prep_start
             
             # Tiempo de la llamada API
             api_start = time.perf_counter()
-            response = await self.model.agenerate(messages)
+            response = await adapter.agenerate([messages])
             api_time = time.perf_counter() - api_start
             
             total_time = time.perf_counter() - start_time
             logger.info(f"""✅ Llamada al modelo completada:
                 - Preparación: {prep_time:.3f}s
                 - Llamada API: {api_time:.3f}s
-                - Total: {total_time:.3f}s
-                - Tokens generados: {len(response.generations[0][0].text.split())}""")
+                - Total: {total_time:.3f}s""")
             
-            return response.generations[0][0]
+            # Extraer el contenido de la respuesta
+            content = response.generations[0][0].text
+            return AIMessage(content=content)
             
         except Exception as e:
             error_time = time.perf_counter() - start_time
