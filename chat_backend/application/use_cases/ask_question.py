@@ -12,6 +12,10 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_ollama import OllamaEmbeddings
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, MessagesState, StateGraph
+import logging
+import time
+
+logger = logging.getLogger(__name__)
 
 
 # Load PDF documents as knowledge base
@@ -88,43 +92,90 @@ langgraph_app = workflow.compile(checkpointer=memory)
 class AskQuestionUseCase:
     def execute(self, session_id: str, query: str, model: str, additional_params: Optional[Dict[str, str]] = None,
                 use_trim: bool = False, max_tokens: int = 2048) -> str:
-        self._update_user_context(session_id, query)
-        user_name = user_context.get_context(session_id, "name")
-        template_messages, use_rag = self._prepare_template_messages(query, user_name, additional_params)
+        start_time = time.perf_counter()
+        
+        try:
+            # 1. Actualización del contexto del usuario
+            context_start = time.perf_counter()
+            self._update_user_context(session_id, query)
+            user_name = user_context.get_context(session_id, "name")
+            context_time = time.perf_counter() - context_start
+            logger.info(f"⏱️ Tiempo actualización contexto: {context_time:.3f}s")
 
-        if use_rag:
-            # Cargar documentos y crear el vector store si no existe
-            global vector_store
-            if vector_store is None:
-                try:
-                    pages = load_documents()
-                    if model == "ollama":
-                        vector_store = InMemoryVectorStore.from_documents(pages, OllamaEmbeddings(model="llama3"))
-                    else:
-                        vector_store = InMemoryVectorStore.from_documents(pages, OpenAIEmbeddings())
-                    print(f"Loaded {len(pages)} pages from knowledge base.")
-                except FileNotFoundError as e:
-                    print(e)
-                    return "Error: Knowledge base file not found."
+            # 2. Preparación de mensajes
+            prep_start = time.perf_counter()
+            template_messages, use_rag = self._prepare_template_messages(query, user_name, additional_params)
+            prep_time = time.perf_counter() - prep_start
+            logger.info(f"⏱️ Tiempo preparación mensajes: {prep_time:.3f}s")
 
-            # Recuperar documentos relevantes para la consulta sobre información de la empresa
-            retriever = vector_store.as_retriever()
-            retrieved_docs = retriever.invoke(query, k=2)
-            if not retrieved_docs:
-                print("No se encontraron documentos relevantes para la consulta.")
-                return "No relevant documents found."
-            retrieved_context = "".join(doc.page_content for doc in retrieved_docs)
-            # Incluir el contexto en el mensaje del sistema
-            system_prompt = f"""You are an assistant for question-answering tasks. 
-Use the following pieces of retrieved context to answer the question.
-If you don't know the answer, just say that you don't know.
-Use three sentences maximum and keep the answer concise.
-Context: {retrieved_context}"""
-            print(f"System Prompt con contexto recuperado: {system_prompt}")
-            template_messages.insert(0, ("system", system_prompt))
+            if use_rag:
+                # 3. Recuperación de documentos relevantes
+                retrieval_start = time.perf_counter()
+                global vector_store
+                if vector_store is None:
+                    try:
+                        pages = load_documents()
+                        if model == "ollama":
+                            vector_store = InMemoryVectorStore.from_documents(pages, OllamaEmbeddings(model="llama3"))
+                        else:
+                            vector_store = InMemoryVectorStore.from_documents(pages, OpenAIEmbeddings())
+                        print(f"Loaded {len(pages)} pages from knowledge base.")
+                    except FileNotFoundError as e:
+                        print(e)
+                        return "Error: Knowledge base file not found."
 
-        prompt_value = self._create_prompt(template_messages, query)
-        return self._invoke_langgraph_app(session_id, prompt_value, model, use_trim, max_tokens)
+                retriever = vector_store.as_retriever()
+                retrieved_docs = retriever.invoke(query, k=2)
+                retrieval_time = time.perf_counter() - retrieval_start
+                logger.info(f"⏱️ Tiempo recuperación documentos: {retrieval_time:.3f}s")
+
+                # 4. Procesamiento de embeddings
+                embed_start = time.perf_counter()
+                retrieved_context = "".join(doc.page_content for doc in retrieved_docs)
+                system_prompt = f"""You are an assistant for question-answering tasks. 
+                    Use the following pieces of retrieved context to answer the question.
+                    If you don't know the answer, just say that you don't know.
+                    Use three sentences maximum and keep the answer concise.
+                    Context: {retrieved_context}"""
+                template_messages.insert(0, ("system", system_prompt))
+                embed_time = time.perf_counter() - embed_start
+                logger.info(f"⏱️ Tiempo procesamiento embeddings: {embed_time:.3f}s")
+
+            # 5. Creación del prompt
+            prompt_start = time.perf_counter()
+            prompt_value = self._create_prompt(template_messages, query)
+            prompt_time = time.perf_counter() - prompt_start
+            logger.info(f"⏱️ Tiempo creación prompt: {prompt_time:.3f}s")
+
+            # 6. Llamada al modelo
+            model_start = time.perf_counter()
+            response = self._invoke_langgraph_app(session_id, prompt_value, model, use_trim, max_tokens)
+            model_time = time.perf_counter() - model_start
+            logger.info(f"⏱️ Tiempo llamada al modelo: {model_time:.3f}s")
+
+            # Métricas finales
+            total_time = time.perf_counter() - start_time
+            logger.info(f"""📊 Desglose de tiempos del caso de uso:
+                - Actualización contexto: {context_time:.3f}s
+                - Preparación mensajes: {prep_time:.3f}s
+                - Recuperación documentos: {retrieval_time:.3f}s (si aplica)
+                - Procesamiento embeddings: {embed_time:.3f}s (si aplica)
+                - Creación prompt: {prompt_time:.3f}s
+                - Llamada al modelo: {model_time:.3f}s
+                - Tiempo total: {total_time:.3f}s
+                
+                Métricas adicionales:
+                - Tamaño del prompt: {len(str(prompt_value))} caracteres
+                - Tamaño de la respuesta: {len(str(response))} caracteres
+                - Modelo usado: {model}
+                """)
+
+            return response
+
+        except Exception as e:
+            error_time = time.perf_counter() - start_time
+            logger.error(f"❌ Error en el caso de uso (tiempo: {error_time:.3f}s): {str(e)}")
+            raise
 
     def _update_user_context(self, session_id: str, query: str):
         if "soy" in query.lower():
