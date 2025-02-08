@@ -27,25 +27,24 @@ class VectorStoreManager:
         """Inicialización asíncrona al inicio de la aplicación"""
         if cls._vector_store is None:
             try:
-                logger.info("🔄 Inicializando vector store...")
+                logger.info("🔄 Inicializando vector store persistente...")
                 start_time = time.perf_counter()
                 
-                # Cargar documentos
+                # 1. Carga de documentos (una sola vez)
                 docs_start = time.perf_counter()
                 documents = load_documents()
-                if not documents:
-                    raise ValueError("No se encontraron documentos para cargar")
                 docs_time = time.perf_counter() - docs_start
                 logger.info(f"📚 Documentos cargados en {docs_time:.3f}s")
                 
-                # Crear embeddings
+                # 2. Configuración de embeddings
                 embed_start = time.perf_counter()
                 embeddings = OllamaEmbeddings(model="llama3.2")
                 
-                # Usar Chroma para persistencia
+                # 3. Configuración de Chroma persistente
                 persist_directory = os.path.join(os.path.dirname(__file__), '../../../vector_store')
                 os.makedirs(persist_directory, exist_ok=True)
                 
+                # 4. Inicialización de Chroma con persistencia
                 cls._vector_store = Chroma.from_documents(
                     documents=documents,
                     embedding=embeddings,
@@ -54,10 +53,12 @@ class VectorStoreManager:
                 embed_time = time.perf_counter() - embed_start
                 
                 total_time = time.perf_counter() - start_time
-                logger.info(f"""✅ Vector store inicializado:
+                logger.info(f"""✅ Vector store persistente inicializado:
                     - Carga de documentos: {docs_time:.3f}s
                     - Creación de embeddings: {embed_time:.3f}s
-                    - Tiempo total: {total_time:.3f}s""")
+                    - Tiempo total: {total_time:.3f}s
+                    - Documentos procesados: {len(documents)}
+                    - Directorio de persistencia: {persist_directory}""")
                 
             except Exception as e:
                 logger.error(f"❌ Error inicializando vector store: {str(e)}")
