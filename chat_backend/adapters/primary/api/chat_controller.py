@@ -17,7 +17,7 @@ class QuestionRequest(BaseModel):
     additional_params: Optional[Dict[str, str]] = None  # Additional parameters for context (e.g., input_language, output_language)
 
 
-router = APIRouter()
+router = APIRouter(tags=["chat"])
 
 # Define a mapping of models to their max token limits
 MODEL_MAX_TOKENS = {
@@ -39,14 +39,20 @@ async def ask_question(request: QuestionRequest):
             max_tokens=MODEL_MAX_TOKENS.get(request.model, 2048)
         )
         
+        # Loguear la respuesta completa antes de enviarla
+        logger.info(f"🤖 Respuesta generada: {response}")
+        
         total_time = time.perf_counter() - start_time
-        logger.info(f"✅ Respuesta generada en {total_time:.3f}s")
+        logger.info(f"✅ Respuesta enviada en {total_time:.3f}s")
         
         return {"response": response}
         
     except Exception as e:
         error_time = time.perf_counter() - start_time
-        logger.error(f"❌ Error: {str(e)} ({error_time:.3f}s)")
+        error_msg = f"❌ Error: {str(e)} ({error_time:.3f}s)"
+        if 'response' in locals():
+            error_msg += f"\nÚltima respuesta generada: {response}"
+        logger.error(error_msg)
         raise HTTPException(
             status_code=500,
             detail=str(e)
