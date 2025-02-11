@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from adapters.secondary.vector_store.vector_store_singleton import VectorStoreManager
-from application.services.document_loader import load_documents
 from adapters.primary.api.chat_controller import router
 import logging
 import time

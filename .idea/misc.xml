@@ -3,5 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.11 (chatAudifarma)" />
   </component>
-  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (chatAudifarma)" project-jdk-type="Python SDK" />
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.11 (chatPython)" project-jdk-type="Python SDK" />
 </project>

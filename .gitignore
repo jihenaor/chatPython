@@ -1,5 +1,7 @@
 .idea/workspace.xml
 
+.env
+
 # Ignorar archivos compilados de Python
 __pycache__/
 *.py[cod]
@@ -16,3 +18,7 @@ env/
 *.egg-info/
 dist/
 build/
+
+# Archivos de bases de datos y caché del vector store
+chat_backend/vector_store/
+chat_backend/0.2.27
