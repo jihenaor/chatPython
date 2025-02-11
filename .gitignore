@@ -1,11 +1,8 @@
 .idea/workspace.xml
 
-.env
-
-# Archivos y directorios generados por Python
+# Ignorar archivos compilados de Python
 __pycache__/
 *.py[cod]
-*$py.class
 
 # Ignorar entornos virtuales
 venv/
@@ -19,7 +16,3 @@ env/
 *.egg-info/
 dist/
 build/
-
-# Archivos o carpetas adicionales que no deseas versionar
-0.2.27
-vector_store/
