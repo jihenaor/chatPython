@@ -21,7 +21,7 @@ class ChatAdapterFactory:
 
         self.adapters = {
             "ollama": ChatOllama(
-                model="llama3.2",
+                model="deepseek-r1:1.5b",
                 temperature=0,
             ),
             "openai": ChatOpenAI(

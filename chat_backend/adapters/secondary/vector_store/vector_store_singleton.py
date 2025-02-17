@@ -38,7 +38,7 @@ class VectorStoreManager:
                 
                 # 2. Configuración de embeddings
                 embed_start = time.perf_counter()
-                embeddings = OllamaEmbeddings(model="llama3.2")
+                embeddings = OllamaEmbeddings(model="deepseek-r1:1.5b")
                 
                 # 3. Configuración de Chroma persistente
                 persist_directory = os.path.join(os.path.dirname(__file__), '../../../vector_store')
