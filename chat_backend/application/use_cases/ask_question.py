@@ -47,7 +47,7 @@ class AskQuestionUseCase:
             context = "\n".join(doc.page_content for doc in retrieved_docs)
             
             prompt = ChatPromptTemplate.from_messages([
-                ("system", """Eres un asistente experto que responde preguntas basándose en el contexto proporcionado.
+                ("system", """Eres un asistente experto que responde en español a preguntas basándose en el contexto proporcionado.
                     Usa solo la información del contexto para responder.
                     Si la información no está en el contexto, indica que no puedes responder.
                     Mantén las respuestas concisas y directas.
@@ -71,8 +71,9 @@ class AskQuestionUseCase:
             # 3. Generación de respuesta
             generation_start = time.perf_counter()
             response = await self.chat_adapter.invoke(messages)
+
             generation_time = time.perf_counter() - generation_start
-            
+
             metrics["generation"] = {
                 "time": generation_time,
                 "response_length": len(response.content)
